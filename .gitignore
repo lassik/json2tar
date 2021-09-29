@@ -1,0 +1,3 @@
+*.dSYM
+example*
+json2tar
