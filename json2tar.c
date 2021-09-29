@@ -232,12 +232,16 @@ static void after_value(void)
     }
 }
 
-static void directory_value(void)
+static void directory_value(int type)
 {
     before_value();
     build_path();
-    if (path_len)
-        tar_directory(stack_top->type == STACK_ARRAY);
+    int was_empty = stack_empty();
+    stack_push(type);
+    if (!was_empty) {
+        path_putc('/');
+        tar_directory(type == STACK_ARRAY);
+    }
     after_value();
 }
 
@@ -293,12 +297,10 @@ static void json2tar(void)
             break;
         }
         case JSONT_ARRAY_START:
-            stack_push(STACK_ARRAY);
-            directory_value();
+            directory_value(STACK_ARRAY);
             break;
         case JSONT_OBJECT_START:
-            stack_push(STACK_OBJECT);
-            directory_value();
+            directory_value(STACK_OBJECT);
             break;
         case JSONT_OBJECT_END: //! Fallthrough
         case JSONT_ARRAY_END:
