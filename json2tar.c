@@ -39,6 +39,8 @@ static void slurp(FILE *input)
     memset(inbuf + inlen, 0, incap - inlen);
 }
 
+#define STICKY_BIT 01000
+
 #define STACK_ARRAY 'A'
 #define STACK_OBJECT 'O'
 
@@ -189,20 +191,26 @@ static void write_tar_header(void)
     write_bytes(tar, sizeof(tar));
 }
 
-static void tar_regular_file(const void *bytes, size_t nbyte)
+static void tar_regular_file(const void *bytes, size_t nbyte, int sticky)
 {
+    unsigned long mode = 0644UL;
+    if (sticky)
+        mode |= STICKY_BIT;
     *tar_type = '0';
-    snprintf(&tar[100], 8, "%7lou", (unsigned long)0644);
+    snprintf(&tar[100], 8, "%7lou", mode);
     snprintf(&tar[124], 12, "%011zo", nbyte);
     write_tar_header();
     write_bytes(bytes, nbyte);
     write_bytes(zeros, tar_padding(nbyte));
 }
 
-static void tar_directory(void)
+static void tar_directory(int sticky)
 {
+    unsigned long mode = 0755UL;
+    if (sticky)
+        mode |= STICKY_BIT;
     *tar_type = '5';
-    snprintf(&tar[100], 8, "%7lou", (unsigned long)0755);
+    snprintf(&tar[100], 8, "%7lou", mode);
     write_tar_header();
 }
 
@@ -229,7 +237,7 @@ static void directory_value(void)
     before_value();
     build_path();
     if (path_len)
-        tar_directory();
+        tar_directory(stack_top->type == STACK_ARRAY);
     after_value();
 }
 
@@ -255,9 +263,10 @@ static void regular_value(jsont_ctx_t *jsont, jsont_tok_t tok)
     } else {
         value_nbyte = jsont_data_value(jsont, &value_bytes);
     }
-    if (value_nbyte && !value_bytes)
+    if (value_nbyte && !value_bytes) {
         panic_memory();
-    tar_regular_file(value_bytes, value_nbyte);
+    }
+    tar_regular_file(value_bytes, value_nbyte, tok == JSONT_STRING);
     after_value();
 }
 
