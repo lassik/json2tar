@@ -144,14 +144,10 @@ static void build_path(void)
         if (!path_empty()) {
             path_putc('/');
         }
-        if (entry->type == STACK_OBJECT) {
-            if (entry->object_field) {
-                path_puts_url(entry->object_field);
-            }
-        } else if (entry->type == STACK_ARRAY) {
-            if (entry->array_length) {
-                path_putu_size(entry->array_length - 1);
-            }
+        if ((entry->type == STACK_OBJECT) && entry->object_field) {
+            path_puts_url(entry->object_field);
+        } else if ((entry->type == STACK_ARRAY) && entry->array_length) {
+            path_putu_size(entry->array_length - 1);
         }
     }
 }
