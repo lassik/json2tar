@@ -116,8 +116,8 @@ static void path_puts_url(const char *s)
         } else {
             unsigned char byte = *s;
             path_putc('%');
-            path_putc(hex[byte] / sizeof(hex));
-            path_putc(hex[byte] % sizeof(hex));
+            path_putc(hex[0xf & (byte / 16)]);
+            path_putc(hex[0xf & byte]);
         }
     }
 }
