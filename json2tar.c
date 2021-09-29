@@ -300,6 +300,7 @@ static void json2tar(void)
             break;
         }
         default:
+            panic("unknown token type from jsont");
             break;
         }
     }
