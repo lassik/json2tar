@@ -207,6 +207,23 @@ static void tar_directory(void)
     write_tar_header();
 }
 
+static void before_value(void)
+{
+    if (!stack_empty()) {
+        if (stack_top->type == 'A')
+            stack_top->array_length++;
+    }
+}
+
+static void after_value(void)
+{
+    if (!stack_empty()) {
+        if (stack_top->type == 'O') {
+            set_object_field(stack_top, 0);
+        }
+    }
+}
+
 static void json2tar(void)
 {
     jsont_ctx_t *jsont = jsont_create(0);
@@ -256,10 +273,7 @@ static void json2tar(void)
         case JSONT_NUMBER_INT: //! Fallthrough
         case JSONT_NUMBER_FLOAT: //! Fallthrough
         case JSONT_STRING: {
-            if (!stack_empty()) {
-                if (stack_top->type == 'A')
-                    stack_top->array_length++;
-            }
+            before_value();
             build_path();
             if (tok == JSONT_TRUE) {
                 value_string = "true";
@@ -279,11 +293,7 @@ static void json2tar(void)
             if (value_nbyte && !value_bytes)
                 panic_memory();
             tar_regular_file(value_bytes, value_nbyte);
-            if (!stack_empty()) {
-                if (stack_top->type == 'O') {
-                    set_object_field(stack_top, 0);
-                }
-            }
+            after_value();
             break;
         }
         default:
