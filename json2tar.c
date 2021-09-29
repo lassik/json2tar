@@ -50,6 +50,7 @@ static char tar[512];
 static char *const tar_type = &tar[156];
 static char *const path = tar;
 static const size_t path_size = 100;
+static size_t path_len;
 static struct stack_entry stack[MAXDEPTH]; // Zeroth entry is a dummy one.
 static struct stack_entry *stack_top = stack;
 
@@ -76,31 +77,79 @@ static void set_object_field(struct stack_entry *entry, char *field)
     entry->object_field = field;
 }
 
-static void build_path(void)
+static int safe_path_char(int ch)
+{
+    char safe_punct[] = "!#$%&'()+,-.;=@[]^_`{}~";
+    return (((ch >= 'A') && (ch <= 'Z')) || ((ch >= 'a') && (ch <= 'z'))
+        || ((ch >= '0') && (ch <= '9')) || strchr(safe_punct, ch));
+}
+
+static int path_empty() { return !path_len; }
+
+static void path_clear(void)
 {
     memset(path, 0, path_size);
+    path_len = 0;
+}
+
+static void path_putc(int c)
+{
+    if (path_len >= path_size - 1) {
+        panic("path too long");
+    }
+    path[path_len++] = c;
+}
+
+static void path_puts(const char *s)
+{
+    for (; *s; s++) {
+        path_putc(*s);
+    }
+}
+
+static void path_puts_url(const char *s)
+{
+    const char hex[16] = "0123456789ABCDEF";
+    for (; *s; s++) {
+        if (safe_path_char(*s)) {
+            path_putc(*s);
+        } else {
+            unsigned char byte = *s;
+            path_putc('%');
+            path_putc(hex[byte] / sizeof(hex));
+            path_putc(hex[byte] % sizeof(hex));
+        }
+    }
+}
+
+static void path_putu_size(size_t size)
+{
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%zu", size);
+    path_puts(buf);
+}
+
+static void build_path(void)
+{
+    path_clear();
     if (stack_empty()) {
-        snprintf(path, path_size, "%s", "root");
+        path_puts("root");
         return;
     }
     struct stack_entry *entry;
-    char *append = path;
     for (entry = stack + 1; entry <= stack_top; entry++) {
-        if (append > path) {
-            *append++ = '/';
+        if (!path_empty()) {
+            path_putc('/');
         }
         if (entry->type == 'O') {
             if (entry->object_field) {
-                snprintf(append, path_size - (append - path), "%s",
-                    entry->object_field);
+                path_puts_url(entry->object_field);
             }
         } else if (entry->type == 'A') {
             if (entry->array_length) {
-                snprintf(append, path_size - (append - path), "%zu",
-                    entry->array_length - 1);
+                path_putu_size(entry->array_length - 1);
             }
         }
-        append = strchr(append, 0);
     }
 }
 
