@@ -305,6 +305,8 @@ static void json2tar(void)
         }
     }
     jsont_destroy(jsont);
+    write_bytes(zeros, 512);
+    write_bytes(zeros, 512);
 }
 
 int main(int argc, char **argv)
