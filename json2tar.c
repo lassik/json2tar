@@ -39,10 +39,13 @@ static void slurp(FILE *input)
     memset(inbuf + inlen, 0, incap - inlen);
 }
 
+#define STACK_ARRAY 'A'
+#define STACK_OBJECT 'O'
+
 struct stack_entry {
     char *object_field;
     size_t array_length;
-    int type; // 'A' 'O' 0
+    int type;
 };
 
 static const char zeros[512];
@@ -141,11 +144,11 @@ static void build_path(void)
         if (!path_empty()) {
             path_putc('/');
         }
-        if (entry->type == 'O') {
+        if (entry->type == STACK_OBJECT) {
             if (entry->object_field) {
                 path_puts_url(entry->object_field);
             }
-        } else if (entry->type == 'A') {
+        } else if (entry->type == STACK_ARRAY) {
             if (entry->array_length) {
                 path_putu_size(entry->array_length - 1);
             }
@@ -210,7 +213,7 @@ static void tar_directory(void)
 static void before_value(void)
 {
     if (!stack_empty()) {
-        if (stack_top->type == 'A')
+        if (stack_top->type == STACK_ARRAY)
             stack_top->array_length++;
     }
 }
@@ -218,7 +221,7 @@ static void before_value(void)
 static void after_value(void)
 {
     if (!stack_empty()) {
-        if (stack_top->type == 'O') {
+        if (stack_top->type == STACK_OBJECT) {
             set_object_field(stack_top, 0);
         }
     }
@@ -261,10 +264,10 @@ static void json2tar(void)
             break;
         }
         case JSONT_ARRAY_START:
-            push_directory('A');
+            push_directory(STACK_ARRAY);
             break;
         case JSONT_OBJECT_START:
-            push_directory('O');
+            push_directory(STACK_OBJECT);
             break;
         case JSONT_OBJECT_END: //! Fallthrough
         case JSONT_ARRAY_END:
