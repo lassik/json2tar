@@ -224,6 +224,17 @@ static void after_value(void)
     }
 }
 
+static void push_directory(int type)
+{
+    before_value();
+    if (!stack_empty()) {
+        build_path();
+        tar_directory();
+    }
+    stack_push(type);
+    after_value();
+}
+
 static void json2tar(void)
 {
     jsont_ctx_t *jsont = jsont_create(0);
@@ -250,22 +261,10 @@ static void json2tar(void)
             break;
         }
         case JSONT_ARRAY_START:
-            before_value();
-            if (!stack_empty()) {
-                build_path();
-                tar_directory();
-            }
-            stack_push('A');
-            after_value();
+            push_directory('A');
             break;
         case JSONT_OBJECT_START:
-            before_value();
-            if (!stack_empty()) {
-                build_path();
-                tar_directory();
-            }
-            stack_push('O');
-            after_value();
+            push_directory('O');
             break;
         case JSONT_OBJECT_END: //! Fallthrough
         case JSONT_ARRAY_END:
