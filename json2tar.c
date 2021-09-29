@@ -57,6 +57,12 @@ static size_t path_len;
 static struct stack_entry stack[MAXDEPTH]; // Zeroth entry is a dummy one.
 static struct stack_entry *stack_top = stack;
 
+static void set_object_field(struct stack_entry *entry, char *field)
+{
+    free(entry->object_field);
+    entry->object_field = field;
+}
+
 static int stack_empty() { return stack_top == stack; }
 
 static void stack_push(int type)
@@ -69,15 +75,9 @@ static void stack_push(int type)
 
 static void stack_pop(void)
 {
-    free(stack_top->object_field);
+    set_object_field(stack_top, 0);
     memset(stack_top, 0, sizeof(*stack_top));
     stack_top--;
-}
-
-static void set_object_field(struct stack_entry *entry, char *field)
-{
-    free(entry->object_field);
-    entry->object_field = field;
 }
 
 static int safe_path_char(int ch)
@@ -209,8 +209,9 @@ static void tar_directory(void)
 static void before_value(void)
 {
     if (!stack_empty()) {
-        if (stack_top->type == STACK_ARRAY)
+        if (stack_top->type == STACK_ARRAY) {
             stack_top->array_length++;
+        }
     }
 }
 
@@ -223,14 +224,40 @@ static void after_value(void)
     }
 }
 
-static void push_directory(int type)
+static void directory_value(void)
 {
     before_value();
-    if (!stack_empty()) {
-        build_path();
+    build_path();
+    if (path_len)
         tar_directory();
+    after_value();
+}
+
+static void regular_value(jsont_ctx_t *jsont, jsont_tok_t tok)
+{
+    const char *value_string;
+    const uint8_t *value_bytes;
+    size_t value_nbyte;
+    before_value();
+    build_path();
+    if (tok == JSONT_TRUE) {
+        value_string = "true";
+    } else if (tok == JSONT_FALSE) {
+        value_string = "false";
+    } else if (tok == JSONT_NULL) {
+        value_string = "null";
+    } else {
+        value_string = 0;
     }
-    stack_push(type);
+    if (value_string) {
+        value_bytes = (const uint8_t *)value_string;
+        value_nbyte = strlen(value_string);
+    } else {
+        value_nbyte = jsont_data_value(jsont, &value_bytes);
+    }
+    if (value_nbyte && !value_bytes)
+        panic_memory();
+    tar_regular_file(value_bytes, value_nbyte);
     after_value();
 }
 
@@ -239,9 +266,6 @@ static void json2tar(void)
     jsont_ctx_t *jsont = jsont_create(0);
     jsont_reset(jsont, inbuf, inlen);
     int done = 0;
-    const char *value_string;
-    const uint8_t *value_bytes;
-    size_t value_nbyte;
     while (!done) {
         jsont_tok_t tok = jsont_next(jsont);
         switch (tok) {
@@ -260,10 +284,12 @@ static void json2tar(void)
             break;
         }
         case JSONT_ARRAY_START:
-            push_directory(STACK_ARRAY);
+            stack_push(STACK_ARRAY);
+            directory_value();
             break;
         case JSONT_OBJECT_START:
-            push_directory(STACK_OBJECT);
+            stack_push(STACK_OBJECT);
+            directory_value();
             break;
         case JSONT_OBJECT_END: //! Fallthrough
         case JSONT_ARRAY_END:
@@ -275,27 +301,7 @@ static void json2tar(void)
         case JSONT_NUMBER_INT: //! Fallthrough
         case JSONT_NUMBER_FLOAT: //! Fallthrough
         case JSONT_STRING: {
-            before_value();
-            build_path();
-            if (tok == JSONT_TRUE) {
-                value_string = "true";
-            } else if (tok == JSONT_FALSE) {
-                value_string = "false";
-            } else if (tok == JSONT_NULL) {
-                value_string = "null";
-            } else {
-                value_string = 0;
-            }
-            if (value_string) {
-                value_bytes = (const uint8_t *)value_string;
-                value_nbyte = strlen(value_string);
-            } else {
-                value_nbyte = jsont_data_value(jsont, &value_bytes);
-            }
-            if (value_nbyte && !value_bytes)
-                panic_memory();
-            tar_regular_file(value_bytes, value_nbyte);
-            after_value();
+            regular_value(jsont, tok);
             break;
         }
         default:
