@@ -79,9 +79,9 @@ static void set_object_field(struct stack_entry *entry, char *field)
 
 static int safe_path_char(int ch)
 {
-    char safe_punct[] = "!#$%&'()+,-.;=@[]^_`{}~";
+    char url_unreserved_chars[] = "-._~";
     return (((ch >= 'A') && (ch <= 'Z')) || ((ch >= 'a') && (ch <= 'z'))
-        || ((ch >= '0') && (ch <= '9')) || strchr(safe_punct, ch));
+        || ((ch >= '0') && (ch <= '9')) || strchr(url_unreserved_chars, ch));
 }
 
 static int path_empty() { return !path_len; }
