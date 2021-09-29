@@ -250,18 +250,22 @@ static void json2tar(void)
             break;
         }
         case JSONT_ARRAY_START:
+            before_value();
             if (!stack_empty()) {
                 build_path();
                 tar_directory();
             }
             stack_push('A');
+            after_value();
             break;
         case JSONT_OBJECT_START:
+            before_value();
             if (!stack_empty()) {
                 build_path();
                 tar_directory();
             }
             stack_push('O');
+            after_value();
             break;
         case JSONT_OBJECT_END: //! Fallthrough
         case JSONT_ARRAY_END:
